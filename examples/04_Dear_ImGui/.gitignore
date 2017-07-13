@@ -1,0 +1,11 @@
+app
+*.obj
+*.exe
+*.dll
+*.out
+imgui.ini
+
+main
+main.o
+main.bc
+main.ll

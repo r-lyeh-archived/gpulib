@@ -1,0 +1,10 @@
+*~
+*.*.*
+*.exp
+*.obj
+*.lib
+*.dll
+*.txt.user
+*.DS_Store
+libimgui.a
+libimgui.so

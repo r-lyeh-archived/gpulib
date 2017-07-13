@@ -1,0 +1,67 @@
+#import "../../gpulib.flow";
+#import imgui "../../gpulib_imgui.flow";
+#import sdl "sdl2.flow";
+#import "strings.flow";
+#import "print.flow";
+
+color_for_text := imgui.ImVec3{236.0 / 255.0, 240.0 / 255.0, 241.0 / 255.0};
+color_for_head := imgui.ImVec3{ 41.0 / 255.0, 128.0 / 255.0, 185.0 / 255.0};
+color_for_area := imgui.ImVec3{ 57.0 / 255.0,  79.0 / 255.0, 105.0 / 255.0};
+color_for_body := imgui.ImVec3{ 44.0 / 255.0,  62.0 / 255.0,  80.0 / 255.0};
+color_for_pops := imgui.ImVec3{ 33.0 / 255.0,  46.0 / 255.0,  60.0 / 255.0};
+show_test_window := true;
+
+main :: () {
+  using gpulib;
+  using strings;
+
+  window: rawptr;
+  Window(c("Dear ImGui"), 1280, 720, 4, 0, 0, ^window, nil);
+  SetDebugCallback(cast(rawptr)DebugCallback, nil);
+
+  imgui.Init();
+
+  io := imgui.GetIO();
+  style := imgui.GetStyle();
+
+  font: [10000]byte;
+  print.bprint(font[..], "%s%s", s(sdl.GetBasePath()), "NotoSans.ttf");
+  imgui.ImFontAtlas_AddFontFromFileTTF(io.Fonts, ^font[0], 24, nil, nil);
+
+  style.ScrollbarRounding = 0;
+  style.WindowRounding    = 0;
+  style.FrameRounding     = 0;
+
+  #label loop for {
+    {
+      Clear();
+      imgui.NewFrame(window, true);
+      defer Swap(window);
+      defer imgui.Render();
+      // TODO(constantine): defer {} doesn't work here, investigate why
+      // defer {
+      //   imgui.Render();
+      //   Swap(window);
+      // }
+
+      // Flat UI by yorick.penninks: https://color.adobe.com/Flat-UI-color-theme-2469224/
+      imgui.ColorEdit3(c("Text"), ^color_for_text.x);
+      imgui.ColorEdit3(c("Head"), ^color_for_head.x);
+      imgui.ColorEdit3(c("Area"), ^color_for_area.x);
+      imgui.ColorEdit3(c("Body"), ^color_for_body.x);
+      imgui.ColorEdit3(c("Pops"), ^color_for_pops.x);
+      imgui.EasyTheming(color_for_text, color_for_head, color_for_area, color_for_body, color_for_pops);
+
+      imgui.ShowTestWindow(^show_test_window);
+    }
+    
+    for e: sdl.Event; sdl.PollEvent(^e); {
+      imgui.ProcessEvent(^e);
+      if e.type == sdl.EventType.QUIT {
+        break loop;
+      }
+    }
+  }
+
+  imgui.Deinit();
+}

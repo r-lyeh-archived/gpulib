@@ -1,0 +1,10 @@
+app
+*.obj
+*.exe
+*.dll
+*.out
+
+main
+main.o
+main.bc
+main.ll

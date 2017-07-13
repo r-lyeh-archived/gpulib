@@ -1,0 +1,3 @@
+Cubemap textures by Chad Wolfe: http://opengameart.org/content/sky-box-sunny-day
+Cubemap textures by Spiney: http://opengameart.org/content/cloudy-skyboxes
+Checker textures by Igor Grinchesku: https://github.com/Arahnoid/UVChecker-map
