@@ -1,4 +1,3 @@
-#define GPU_DEBUG_CALLBACK
 #include "../../gpulib.h"
 
 typedef struct { float x, y, z; } v3;
@@ -48,20 +47,19 @@ int main() {
   vector2[3].z = 24.0;
 
   char * vert_string = GPU_VERT_HEAD
-      " layout(binding = 0) uniform samplerBuffer s_vector1;     \n"
-      " layout(binding = 1) uniform samplerBuffer s_vector2;     \n"
-      "                                                          \n"
-      " out vec3 vector3;                                        \n"
-      "                                                          \n"
-      " void main()                                              \n"
-      " {                                                        \n"
-      "   vec3 vector1 = texelFetch(s_vector1, gl_VertexID).xyz; \n"
-      "   vec3 vector2 = texelFetch(s_vector2, gl_VertexID).xyz; \n"
-      "                                                          \n"
-      "   vector3 = vector1 + vector2;                           \n"
-      " }                                                        \n";
+      " layout(binding = 0) uniform samplerBuffer s_v1; \n"
+      " layout(binding = 1) uniform samplerBuffer s_v2; \n"
+      "                                                 \n"
+      " out vec3 out_v3;                                \n"
+      "                                                 \n"
+      " void main() {                                   \n"
+      "   vec3 v1 = texelFetch(s_v1, gl_VertexID).xyz;  \n"
+      "   vec3 v2 = texelFetch(s_v2, gl_VertexID).xyz;  \n"
+      "                                                 \n"
+      "   out_v3 = v1 + v2;                             \n"
+      " }                                               \n";
 
-  let compute_vert = GpuVertXfb(vert_string, 1, (const char * [4]){"vector3", NULL, NULL, NULL});
+  let compute_vert = GpuVertXfb(vert_string, "out_v3", NULL, NULL, NULL);
 
   let xfb = GpuXfb(vector3, 0, 4 * sizeof(v3), NULL, 0, 0, NULL, 0, 0, NULL, 0, 0);
   let ppo = GpuPpo(compute_vert, 0);
@@ -69,7 +67,7 @@ int main() {
   let vector1_tex = GpuCast(vector1, gpu_xyz_f32_t, 0, 4 * sizeof(v3));
   let vector2_tex = GpuCast(vector2, gpu_xyz_f32_t, 0, 4 * sizeof(v3));
 
-  uint32_t textures[] = {
+  unsigned textures[] = {
     [0] = vector1_tex,
     [1] = vector2_tex
   };

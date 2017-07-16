@@ -4,9 +4,9 @@
 #define SDL_MAIN_HANDLED 1
 #endif
 
-#include "SDL2/SDL.h"
-#include "tinyprofiler.h"
 #include "opengl_functions.h"
+#include "tinyprofiler.h"
+#include "SDL2/SDL.h"
 
 #ifdef _MSC_VER
   #ifndef alloca
@@ -25,24 +25,24 @@ struct gpu_cmd_t {
 };
 
 struct gpu_op_t {
-  int id;
+  struct gpu_cmd_t * cmd;
+  unsigned * tex;
+  unsigned * smp;
+  unsigned ppo;
+  unsigned mode;
+  int cmd_count;
   int tex_first;
   int tex_count;
   int smp_first;
   int smp_count;
-  uint32_t * tex;
-  uint32_t * smp;
-  uint32_t vert;
-  uint32_t frag;
-  uint32_t ppo;
-  uint32_t mode;
-  int cmd_count;
-  struct gpu_cmd_t * cmd;
+  int index;     // Optional index to set to the location 0 uniform
+  unsigned vert; // Optional program id for which index will be set
+  unsigned frag; // Optional program id for which index will be set
 };
 
 enum gpu_draw_t {
-  gpu_lines_t     = 0x0001, // GL_LINES
   gpu_points_t    = 0x0000, // GL_POINTS
+  gpu_lines_t     = 0x0001, // GL_LINES
   gpu_triangles_t = 0x0004  // GL_TRIANGLES
 };
 
@@ -145,7 +145,7 @@ enum gpu_pix_t {
   gpu_f32_t = 0x1406  // GL_FLOAT
 };
 
-static inline void GpuCheckExts(int extensions_count, const char ** extensions) {
+static inline void GpuCheckExts(int extensions_count, char ** extensions) {
   profB(__func__);
   for (int i = 0; i < extensions_count; i += 1) {
     if (SDL_GL_ExtensionSupported(extensions[i]) == SDL_FALSE)
@@ -155,8 +155,8 @@ static inline void GpuCheckExts(int extensions_count, const char ** extensions) 
 }
 
 static inline void GpuWindow(
-    const char * window_title, int window_width, int window_height, int msaa_samples,
-    uint32_t sdl_init_flags, uint32_t sdl_window_flags, SDL_Window ** sdl_window, void ** sdl_glcontext)
+    char * window_title, int window_width, int window_height, int msaa_samples,
+    unsigned sdl_init_flags, unsigned sdl_window_flags, SDL_Window ** sdl_window, void ** sdl_glcontext)
 {
   profB(__func__);
   SDL_assert(sdl_window != NULL);
@@ -189,7 +189,7 @@ static inline void GpuWindow(
 
   SDL_assert(gl_load == 0);
 
-  const char * extensions[] = {
+  char * extensions[] = {
 #ifndef RELEASE
     "GL_KHR_debug",
 #endif
@@ -298,11 +298,11 @@ static inline void GpuWindow(
   glEnable(0x0B44); // GL_CULL_FACE
   glEnable(0x0BE2); // GL_BLEND
 
-  void (*glBlendFunc)(uint32_t, uint32_t) = SDL_GL_GetProcAddress("glBlendFunc");
-  void (*glClipControl)(uint32_t, uint32_t) = SDL_GL_GetProcAddress("glClipControl");
+  void (*glBlendFunc)(unsigned, unsigned) = SDL_GL_GetProcAddress("glBlendFunc");
+  void (*glClipControl)(unsigned, unsigned) = SDL_GL_GetProcAddress("glClipControl");
   void (*glDepthRange)(double, double) = SDL_GL_GetProcAddress("glDepthRange");
   void (*glClearDepth)(double) = SDL_GL_GetProcAddress("glClearDepth");
-  void (*glDepthFunc)(uint32_t) = SDL_GL_GetProcAddress("glDepthFunc");
+  void (*glDepthFunc)(unsigned) = SDL_GL_GetProcAddress("glDepthFunc");
 
   glBlendFunc(0x0302, 0x0303); // GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
   glClipControl(0x8CA1, 0x935F); // GL_LOWER_LEFT, GL_ZERO_TO_ONE
@@ -311,9 +311,9 @@ static inline void GpuWindow(
   glDepthFunc(0x0204); // GL_GREATER
 
   // OPENGL REQUIRED GARBAGE //////////////////////////////////////////////////////////////////////
-  void (*glCreateVertexArrays)(int, uint32_t *) = SDL_GL_GetProcAddress("glCreateVertexArrays"); //
-  void (*glBindVertexArray)(uint32_t) = SDL_GL_GetProcAddress("glBindVertexArray");              //
-  uint32_t vao = 0;                                                                              //
+  void (*glCreateVertexArrays)(int, unsigned *) = SDL_GL_GetProcAddress("glCreateVertexArrays"); //
+  void (*glBindVertexArray)(unsigned) = SDL_GL_GetProcAddress("glBindVertexArray");              //
+  unsigned vao = 0;                                                                              //
   glCreateVertexArrays(1, &vao);                                                                 //
   glBindVertexArray(vao);                                                                        //
   /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -322,7 +322,7 @@ static inline void GpuWindow(
 
 static inline void * GpuMalloc(int bytes) {
   profB(__func__);
-  uint32_t buf_id = 0;
+  unsigned buf_id = 0;
   glCreateBuffers(1, &buf_id);
 
   int size = 4 + bytes;
@@ -333,7 +333,7 @@ static inline void * GpuMalloc(int bytes) {
   if (p == NULL)
     return NULL;
 
-  uint32_t * p_u32 = p;
+  unsigned * p_u32 = p;
   p_u32[0] = buf_id;
   p_u32 += 1;
   profE(__func__);
@@ -341,12 +341,12 @@ static inline void * GpuMalloc(int bytes) {
   return (void *)p_u32;
 }
 
-static inline uint32_t GpuCast(void * gpu_buf_ptr, enum gpu_buf_format_t format, int bytes_first, int bytes_count) {
+static inline unsigned GpuCast(void * gpu_buf_ptr, enum gpu_buf_format_t format, int bytes_first, int bytes_count) {
   profB(__func__);
-  uint32_t tex_id = 0;
+  unsigned tex_id = 0;
   glCreateTextures(35882, 1, &tex_id);
 
-  uint32_t buf_id = ((uint32_t *)gpu_buf_ptr)[-1];
+  unsigned buf_id = ((unsigned *)gpu_buf_ptr)[-1];
 
   glTextureBufferRange(tex_id, format, buf_id, 4 + bytes_first, bytes_count);
   profE(__func__);
@@ -354,9 +354,9 @@ static inline uint32_t GpuCast(void * gpu_buf_ptr, enum gpu_buf_format_t format,
   return tex_id;
 }
 
-static inline uint32_t GpuMallocImg(enum gpu_tex_format_t format, int width, int height, int layer_count, int mipmap_count) {
+static inline unsigned GpuMallocImg(enum gpu_tex_format_t format, int width, int height, int layer_count, int mipmap_count) {
   profB(__func__);
-  uint32_t tex_id = 0;
+  unsigned tex_id = 0;
   glCreateTextures(35866, 1, &tex_id);
 
   glTextureStorage3D(tex_id, mipmap_count, format, width, height, layer_count);
@@ -365,9 +365,9 @@ static inline uint32_t GpuMallocImg(enum gpu_tex_format_t format, int width, int
   return tex_id;
 }
 
-static inline uint32_t GpuMallocCbm(enum gpu_tex_format_t format, int width, int height, int layer_count, int mipmap_count) {
+static inline unsigned GpuMallocCbm(enum gpu_tex_format_t format, int width, int height, int layer_count, int mipmap_count) {
   profB(__func__);
-  uint32_t tex_id = 0;
+  unsigned tex_id = 0;
   glCreateTextures(36873, 1, &tex_id);
 
   glTextureStorage3D(tex_id, mipmap_count, format, width, height, layer_count * 6);
@@ -376,9 +376,9 @@ static inline uint32_t GpuMallocCbm(enum gpu_tex_format_t format, int width, int
   return tex_id;
 }
 
-static inline uint32_t GpuMallocMsi(enum gpu_tex_format_t format, int width, int height, int layer_count, int msaa_samples) {
+static inline unsigned GpuMallocMsi(enum gpu_tex_format_t format, int width, int height, int layer_count, int msaa_samples) {
   profB(__func__);
-  uint32_t tex_id = 0;
+  unsigned tex_id = 0;
   glCreateTextures(37122, 1, &tex_id);
 
   glTextureStorage3DMultisample(tex_id, msaa_samples, format, width, height, layer_count, 0);
@@ -387,11 +387,11 @@ static inline uint32_t GpuMallocMsi(enum gpu_tex_format_t format, int width, int
   return tex_id;
 }
 
-static inline uint32_t GpuCastImg(
-    uint32_t tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
+static inline unsigned GpuCastImg(
+    unsigned tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
 {
   profB(__func__);
-  uint32_t new_tex_id = 0;
+  unsigned new_tex_id = 0;
   glGenTextures(1, &new_tex_id);
 
   glTextureView(new_tex_id, 35866, tex_id, format, mipmap_first, mipmap_count, layer_first, layer_count);
@@ -400,11 +400,11 @@ static inline uint32_t GpuCastImg(
   return new_tex_id;
 }
 
-static inline uint32_t GpuCastCbm(
-    uint32_t tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
+static inline unsigned GpuCastCbm(
+    unsigned tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
 {
   profB(__func__);
-  uint32_t new_tex_id = 0;
+  unsigned new_tex_id = 0;
   glGenTextures(1, &new_tex_id);
 
   glTextureView(new_tex_id, 36873, tex_id, format, mipmap_first, mipmap_count, layer_first * 6, layer_count * 6);
@@ -413,11 +413,11 @@ static inline uint32_t GpuCastCbm(
   return new_tex_id;
 }
 
-static inline uint32_t GpuCastMsi(
-    uint32_t tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
+static inline unsigned GpuCastMsi(
+    unsigned tex_id, enum gpu_tex_format_t format, int layer_first, int layer_count, int mipmap_first, int mipmap_count)
 {
   profB(__func__);
-  uint32_t new_tex_id = 0;
+  unsigned new_tex_id = 0;
   glGenTextures(1, &new_tex_id);
 
   glTextureView(new_tex_id, 37122, tex_id, format, mipmap_first, mipmap_count, layer_first, layer_count);
@@ -427,7 +427,7 @@ static inline uint32_t GpuCastMsi(
 }
 
 static inline void GpuGet(
-    uint32_t tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
+    unsigned tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
     enum gpu_pix_format_t pixel_format, enum gpu_pix_t pixel_type, int pixels_bytes, void * pixels)
 {
   profB(__func__);
@@ -436,7 +436,7 @@ static inline void GpuGet(
 }
 
 static inline void GpuSet(
-    uint32_t tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
+    unsigned tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
     enum gpu_pix_format_t pixel_format, enum gpu_pix_t pixel_type, void * pixels)
 {
   profB(__func__);
@@ -445,7 +445,7 @@ static inline void GpuSet(
 }
 
 static inline void GpuSetPix(
-    uint32_t tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
+    unsigned tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
     enum gpu_pix_format_t pixel_format, enum gpu_pix_t pixel_type, void * pixel)
 {
   profB(__func__);
@@ -454,7 +454,7 @@ static inline void GpuSetPix(
 }
 
 static inline void GpuGetCpi(
-    uint32_t tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
+    unsigned tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
     int pixels_bytes, void * pixels)
 {
   profB(__func__);
@@ -463,7 +463,7 @@ static inline void GpuGetCpi(
 }
 
 static inline void GpuSetCpi(
-    uint32_t tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
+    unsigned tex_id, int layer, int x, int y, int width, int height, int count, int mipmap_level,
     enum gpu_tex_format_t compression_format, int pixels_bytes, void * pixels)
 {
   profB(__func__);
@@ -471,7 +471,7 @@ static inline void GpuSetCpi(
   profE(__func__);
 }
 
-static inline void GpuBmpImg(uint32_t tex_id, int width, int height, int layer_count, const char ** bmp_filepaths) {
+static inline void GpuBmpImg(unsigned tex_id, int width, int height, int layer_count, char ** bmp_filepaths) {
   profB(__func__);
   unsigned char * p = SDL_calloc((width * height * 3) * layer_count, 1);
 
@@ -490,13 +490,13 @@ static inline void GpuBmpImg(uint32_t tex_id, int width, int height, int layer_c
 }
 
 static inline void GpuBmpCbm(
-    uint32_t tex_id, int width, int height, int layer_count,
-    const char ** pos_x_bmp_filepaths,
-    const char ** neg_x_bmp_filepaths,
-    const char ** pos_y_bmp_filepaths,
-    const char ** neg_y_bmp_filepaths,
-    const char ** pos_z_bmp_filepaths,
-    const char ** neg_z_bmp_filepaths)
+    unsigned tex_id, int width, int height, int layer_count,
+    char ** pos_x_bmp_filepaths,
+    char ** neg_x_bmp_filepaths,
+    char ** pos_y_bmp_filepaths,
+    char ** neg_y_bmp_filepaths,
+    char ** pos_z_bmp_filepaths,
+    char ** neg_z_bmp_filepaths)
 {
   profB(__func__);
   unsigned char * p = SDL_calloc((width * height * 3) * layer_count * 6, 1);
@@ -530,11 +530,11 @@ static inline void GpuBmpCbm(
   profE(__func__);
 }
 
-static inline uint32_t GpuSmp(
+static inline unsigned GpuSmp(
     int max_anisotropy, enum gpu_smp_filter_t min_filter, enum gpu_smp_filter_t mag_filter, enum gpu_smp_wrapping_t wrapping)
 {
   profB(__func__);
-  uint32_t smp_id = 0;
+  unsigned smp_id = 0;
   glCreateSamplers(1, &smp_id);
 
   glSamplerParameteri(smp_id, 34046, max_anisotropy);
@@ -548,24 +548,30 @@ static inline uint32_t GpuSmp(
   return smp_id;
 }
 
-static inline uint32_t GpuPro(enum gpu_shader_t shader_type, const char * shader_string, int feedback_count, const char ** feedback_names) {
+static inline unsigned GpuPro(
+    enum gpu_shader_t shader_type, char * shader_string,
+    char * xfb_name_0,
+    char * xfb_name_1,
+    char * xfb_name_2,
+    char * xfb_name_3)
+{
   profB(__func__);
-  uint32_t shader_id = glCreateShader(shader_type);
+  unsigned shader_id = glCreateShader(shader_type);
 
-  glShaderSource(shader_id, 1, (const char **)&shader_string, NULL);
+  glShaderSource(shader_id, 1, (char **)&shader_string, NULL);
   glCompileShader(shader_id);
 
   // Fucking AMD Driver™
   {
-    int compiled = 0;
-    void (*glGetShaderiv)(uint32_t shader, uint32_t pname, int * params) = SDL_GL_GetProcAddress("glGetShaderiv");
-    glGetShaderiv(shader_id, 0x8B81, &compiled); // GL_COMPILE_STATUS
-    if (!compiled) {
+    int is_compiled = 0;
+    void (*glGetShaderiv)(unsigned, unsigned, int *) = SDL_GL_GetProcAddress("glGetShaderiv");
+    glGetShaderiv(shader_id, 0x8B81, &is_compiled); // GL_COMPILE_STATUS
+    if (!is_compiled) {
       int info_len = 0;
       glGetShaderiv(shader_id, 0x8B84, &info_len); // GL_INFO_LOG_LENGTH
       if (info_len > 1) {
         char * info_log = alloca(info_len + 1);
-        void (*glGetShaderInfoLog)(uint32_t shader, int maxLength, int * length, char * infoLog) = SDL_GL_GetProcAddress("glGetShaderInfoLog");
+        void (*glGetShaderInfoLog)(unsigned, int, int *, char *) = SDL_GL_GetProcAddress("glGetShaderInfoLog");
         glGetShaderInfoLog(shader_id, info_len, NULL, info_log);
         printf("Shader compile error:\n%s", info_log);
         {
@@ -586,23 +592,72 @@ static inline uint32_t GpuPro(enum gpu_shader_t shader_type, const char * shader
     }
   }
 
-  uint32_t pro_id = glCreateProgram();
+  unsigned pro_id = glCreateProgram();
   glProgramParameteri(pro_id, 33368, 1);
 
   glAttachShader(pro_id, shader_id);
-  if (feedback_count)
-    glTransformFeedbackVaryings(pro_id, feedback_count, feedback_names, 35981);
-  glLinkProgram(pro_id);
-  glDetachShader(pro_id, shader_id);
 
+  char * xfb_names[4] = {xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3};
+  int xfb_count = 0;
+  if (xfb_name_0) xfb_count += 1;
+  if (xfb_name_1) xfb_count += 1;
+  if (xfb_name_2) xfb_count += 1;
+  if (xfb_name_3) xfb_count += 1;
+  if (xfb_count > 0)
+    glTransformFeedbackVaryings(pro_id, xfb_count, xfb_names, 35981);
+
+  glLinkProgram(pro_id);
+
+  // Fucking AMD Driver™
+  {
+    int is_linked = 0;
+    void (*glGetProgramiv)(unsigned, unsigned, int *) = SDL_GL_GetProcAddress("glGetProgramiv");
+    glGetProgramiv(pro_id, 0x8B82, &is_linked); // GL_LINK_STATUS
+    if (!is_linked) {
+      int info_len = 0;
+      glGetProgramiv(pro_id, 0x8B84, &info_len); // GL_INFO_LOG_LENGTH
+      if (info_len > 1) {
+        char * info_log = alloca(info_len + 1);
+        void (*glGetProgramInfoLog)(unsigned, int, int *, char *) = SDL_GL_GetProcAddress("glGetProgramInfoLog");
+        glGetProgramInfoLog(pro_id, info_len, NULL, info_log);
+        printf("Program link error:\n%s", info_log);
+        printf("Transform feedback varyings count: %d\n", xfb_count);
+        printf("Transform feedback varying name 0: %s%s%s\n", xfb_name_0 ? "\"" : "", xfb_name_0 ? xfb_name_0 : "NULL", xfb_name_0 ? "\"" : "");
+        printf("Transform feedback varying name 1: %s%s%s\n", xfb_name_1 ? "\"" : "", xfb_name_1 ? xfb_name_1 : "NULL", xfb_name_1 ? "\"" : "");
+        printf("Transform feedback varying name 2: %s%s%s\n", xfb_name_2 ? "\"" : "", xfb_name_2 ? xfb_name_2 : "NULL", xfb_name_2 ? "\"" : "");
+        printf("Transform feedback varying name 3: %s%s%s\n", xfb_name_3 ? "\"" : "", xfb_name_3 ? xfb_name_3 : "NULL", xfb_name_3 ? "\"" : "");
+        {
+          int line = 1;
+          printf("%04d: ", line);
+          for (char c = *shader_string; c != '\0'; c = *++shader_string) {
+            printf("%c", c);
+            if (c == '\n') {
+              line += 1;
+              printf("%04d: ", line);
+            }
+          }
+          printf("\n");
+        }
+      }
+      glDetachShader(pro_id, shader_id);
+      glDeleteShader(shader_id);
+      return 0;
+    }
+  }
+
+  glDetachShader(pro_id, shader_id);
   glDeleteShader(shader_id);
   profE(__func__);
 
   return pro_id;
 }
 
-static inline uint32_t GpuProFile(
-    enum gpu_shader_t shader_type, const char * shader_filepath, int feedback_count, const char ** feedback_names)
+static inline unsigned GpuProFile(
+    enum gpu_shader_t shader_type, char * shader_filepath,
+    char * xfb_name_0,
+    char * xfb_name_1,
+    char * xfb_name_2,
+    char * xfb_name_3)
 {
   profB(__func__);
   SDL_RWops * fd = SDL_RWFromFile(shader_filepath, "rb");
@@ -611,33 +666,33 @@ static inline uint32_t GpuProFile(
     return 0;
 
   SDL_RWseek(fd, 0, RW_SEEK_END);
-  int64_t bytes = SDL_RWtell(fd);
+  long bytes = SDL_RWtell(fd);
   SDL_RWseek(fd, 0, RW_SEEK_SET);
   char * src = alloca(bytes + 1);
   src[bytes] = 0;
   SDL_RWread(fd, src, bytes, 1);
   SDL_RWclose(fd);
-  const char * shader_string = &src[0];
+  char * shader_string = &src[0];
   profE(__func__);
 
-  return GpuPro(shader_type, shader_string, feedback_count, feedback_names);
+  return GpuPro(shader_type, shader_string, xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3);
 }
 
-static inline uint32_t GpuVert(const char * shader_string) { return GpuPro(gpu_vert_t, shader_string, 0, NULL); }
-static inline uint32_t GpuFrag(const char * shader_string) { return GpuPro(gpu_frag_t, shader_string, 0, NULL); }
-static inline uint32_t GpuVertFile(const char * shader_filepath) { return GpuProFile(gpu_vert_t, shader_filepath, 0, NULL); }
-static inline uint32_t GpuFragFile(const char * shader_filepath) { return GpuProFile(gpu_frag_t, shader_filepath, 0, NULL); }
-static inline uint32_t GpuVertXfb(const char * shader_string, int feedback_count, const char ** feedback_names) { return GpuPro(gpu_vert_t, shader_string, feedback_count, feedback_names); }
-static inline uint32_t GpuFragXfb(const char * shader_string, int feedback_count, const char ** feedback_names) { return GpuPro(gpu_frag_t, shader_string, feedback_count, feedback_names); }
-static inline uint32_t GpuVertXfbFile(const char * shader_filepath, int feedback_count, const char ** feedback_names) { return GpuProFile(gpu_vert_t, shader_filepath, feedback_count, feedback_names); }
-static inline uint32_t GpuFragXfbFile(const char * shader_filepath, int feedback_count, const char ** feedback_names) { return GpuProFile(gpu_frag_t, shader_filepath, feedback_count, feedback_names); }
+static inline unsigned GpuVert(char * shader_string) { return GpuPro(gpu_vert_t, shader_string, NULL, NULL, NULL, NULL); }
+static inline unsigned GpuFrag(char * shader_string) { return GpuPro(gpu_frag_t, shader_string, NULL, NULL, NULL, NULL); }
+static inline unsigned GpuVertFile(char * shader_filepath) { return GpuProFile(gpu_vert_t, shader_filepath, NULL, NULL, NULL, NULL); }
+static inline unsigned GpuFragFile(char * shader_filepath) { return GpuProFile(gpu_frag_t, shader_filepath, NULL, NULL, NULL, NULL); }
+static inline unsigned GpuVertXfb(char * shader_string, char * xfb_name_0, char * xfb_name_1, char * xfb_name_2, char * xfb_name_3) { return GpuPro(gpu_vert_t, shader_string, xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3); }
+static inline unsigned GpuFragXfb(char * shader_string, char * xfb_name_0, char * xfb_name_1, char * xfb_name_2, char * xfb_name_3) { return GpuPro(gpu_frag_t, shader_string, xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3); }
+static inline unsigned GpuVertXfbFile(char * shader_filepath, char * xfb_name_0, char * xfb_name_1, char * xfb_name_2, char * xfb_name_3) { return GpuProFile(gpu_vert_t, shader_filepath, xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3); }
+static inline unsigned GpuFragXfbFile(char * shader_filepath, char * xfb_name_0, char * xfb_name_1, char * xfb_name_2, char * xfb_name_3) { return GpuProFile(gpu_frag_t, shader_filepath, xfb_name_0, xfb_name_1, xfb_name_2, xfb_name_3); }
 
-static inline void GpuU32(uint32_t program, int location, int count, const uint32_t * value) { glProgramUniform1uiv(program, location, count, value); }
-static inline void GpuI32(uint32_t program, int location, int count, const int      * value) { glProgramUniform1iv(program, location, count, value);  }
-static inline void GpuF32(uint32_t program, int location, int count, const float    * value) { glProgramUniform1fv(program, location, count, value);  }
-static inline void GpuV2f(uint32_t program, int location, int count, const float    * value) { glProgramUniform2fv(program, location, count, value);  }
-static inline void GpuV3f(uint32_t program, int location, int count, const float    * value) { glProgramUniform3fv(program, location, count, value);  }
-static inline void GpuV4f(uint32_t program, int location, int count, const float    * value) { glProgramUniform4fv(program, location, count, value);  }
+static inline void GpuU32(unsigned program, int location, int count, unsigned * value) { glProgramUniform1uiv(program, location, count, value); }
+static inline void GpuI32(unsigned program, int location, int count, int      * value) { glProgramUniform1iv(program, location, count, value);  }
+static inline void GpuF32(unsigned program, int location, int count, float    * value) { glProgramUniform1fv(program, location, count, value);  }
+static inline void GpuV2f(unsigned program, int location, int count, float    * value) { glProgramUniform2fv(program, location, count, value);  }
+static inline void GpuV3f(unsigned program, int location, int count, float    * value) { glProgramUniform3fv(program, location, count, value);  }
+static inline void GpuV4f(unsigned program, int location, int count, float    * value) { glProgramUniform4fv(program, location, count, value);  }
 
 #ifndef GPU_VERT_HEAD
 #define GPU_VERT_HEAD                                       \
@@ -664,9 +719,9 @@ static inline void GpuV4f(uint32_t program, int location, int count, const float
   "#extension GL_ARB_explicit_uniform_location : enable \n"
 #endif
 
-static inline uint32_t GpuPpo(uint32_t vert_pro_id, uint32_t frag_pro_id) {
+static inline unsigned GpuPpo(unsigned vert_pro_id, unsigned frag_pro_id) {
   profB(__func__);
-  uint32_t ppo_id = 0;
+  unsigned ppo_id = 0;
   glCreateProgramPipelines(1, &ppo_id);
 
   if (vert_pro_id) glUseProgramStages(ppo_id, 1, vert_pro_id);
@@ -676,15 +731,15 @@ static inline uint32_t GpuPpo(uint32_t vert_pro_id, uint32_t frag_pro_id) {
   return ppo_id;
 }
 
-static inline uint32_t GpuFbo(
-    uint32_t color_tex_id_0, int color_tex_layer_0,
-    uint32_t color_tex_id_1, int color_tex_layer_1,
-    uint32_t color_tex_id_2, int color_tex_layer_2,
-    uint32_t color_tex_id_3, int color_tex_layer_3,
-    uint32_t depth_tex_id_0, int depth_tex_layer_0)
+static inline unsigned GpuFbo(
+    unsigned color_tex_id_0, int color_tex_layer_0,
+    unsigned color_tex_id_1, int color_tex_layer_1,
+    unsigned color_tex_id_2, int color_tex_layer_2,
+    unsigned color_tex_id_3, int color_tex_layer_3,
+    unsigned depth_tex_id_0, int depth_tex_layer_0)
 {
   profB(__func__);
-  uint32_t fbo_id = 0;
+  unsigned fbo_id = 0;
   glCreateFramebuffers(1, &fbo_id);
 
   glNamedFramebufferTextureLayer(fbo_id, 36096 + 0, depth_tex_id_0, 0, depth_tex_layer_0);
@@ -693,12 +748,12 @@ static inline uint32_t GpuFbo(
   glNamedFramebufferTextureLayer(fbo_id, 36064 + 2, color_tex_id_2, 0, color_tex_layer_2);
   glNamedFramebufferTextureLayer(fbo_id, 36064 + 3, color_tex_id_3, 0, color_tex_layer_3);
 
-  int attachments[4];
-
-  attachments[0] = color_tex_id_0 ? 36064 + 0 : 0;
-  attachments[1] = color_tex_id_1 ? 36064 + 1 : 0;
-  attachments[2] = color_tex_id_2 ? 36064 + 2 : 0;
-  attachments[3] = color_tex_id_3 ? 36064 + 3 : 0;
+  int attachments[4] = {
+    color_tex_id_0 ? 36064 + 0 : 0,
+    color_tex_id_1 ? 36064 + 1 : 0,
+    color_tex_id_2 ? 36064 + 2 : 0,
+    color_tex_id_3 ? 36064 + 3 : 0
+  };
 
   glNamedFramebufferDrawBuffers(fbo_id, 4, attachments);
   profE(__func__);
@@ -706,20 +761,20 @@ static inline uint32_t GpuFbo(
   return fbo_id;
 }
 
-static inline uint32_t GpuXfb(
+static inline unsigned GpuXfb(
     void * gpu_buf_ptr_0, int buf_0_bytes_first, int buf_0_bytes_count,
     void * gpu_buf_ptr_1, int buf_1_bytes_first, int buf_1_bytes_count,
     void * gpu_buf_ptr_2, int buf_2_bytes_first, int buf_2_bytes_count,
     void * gpu_buf_ptr_3, int buf_3_bytes_first, int buf_3_bytes_count)
 {
   profB(__func__);
-  uint32_t xfb_id = 0;
+  unsigned xfb_id = 0;
   glCreateTransformFeedbacks(1, &xfb_id);
 
-  uint32_t buf_0_id = gpu_buf_ptr_0 ? ((uint32_t *)gpu_buf_ptr_0)[-1] : 0;
-  uint32_t buf_1_id = gpu_buf_ptr_1 ? ((uint32_t *)gpu_buf_ptr_1)[-1] : 0;
-  uint32_t buf_2_id = gpu_buf_ptr_2 ? ((uint32_t *)gpu_buf_ptr_2)[-1] : 0;
-  uint32_t buf_3_id = gpu_buf_ptr_3 ? ((uint32_t *)gpu_buf_ptr_3)[-1] : 0;
+  unsigned buf_0_id = gpu_buf_ptr_0 ? ((unsigned *)gpu_buf_ptr_0)[-1] : 0;
+  unsigned buf_1_id = gpu_buf_ptr_1 ? ((unsigned *)gpu_buf_ptr_1)[-1] : 0;
+  unsigned buf_2_id = gpu_buf_ptr_2 ? ((unsigned *)gpu_buf_ptr_2)[-1] : 0;
+  unsigned buf_3_id = gpu_buf_ptr_3 ? ((unsigned *)gpu_buf_ptr_3)[-1] : 0;
 
   if (buf_0_id) glTransformFeedbackBufferRange(xfb_id, 0, buf_0_id, 4 + buf_0_bytes_first, buf_0_bytes_count);
   if (buf_1_id) glTransformFeedbackBufferRange(xfb_id, 1, buf_1_id, 4 + buf_1_bytes_first, buf_1_bytes_count);
@@ -730,19 +785,19 @@ static inline uint32_t GpuXfb(
   return xfb_id;
 }
 
-static inline void GpuBindFbo(uint32_t fbo_id) {
+static inline void GpuBindFbo(unsigned fbo_id) {
   profB(__func__);
   glBindFramebuffer(36160, fbo_id);
   profE(__func__);
 }
 
-static inline void GpuBindXfb(uint32_t xfb_id) {
+static inline void GpuBindXfb(unsigned xfb_id) {
   profB(__func__);
   glBindTransformFeedback(36386, xfb_id);
   profE(__func__);
 }
 
-static inline void GpuDraw(int gpu_op_count, const struct gpu_op_t * gpu_op) {
+static inline void GpuDraw(int gpu_op_count, struct gpu_op_t * gpu_op) {
   profB(__func__);
   for (int i = 0; i < gpu_op_count; i += 1) {
     struct gpu_op_t op = gpu_op[i];
@@ -753,23 +808,24 @@ static inline void GpuDraw(int gpu_op_count, const struct gpu_op_t * gpu_op) {
     if (op.tex != NULL) glBindTextures(op.tex_first, op.tex_count, op.tex);
     if (op.smp != NULL) glBindSamplers(op.smp_first, op.smp_count, op.smp);
 
-    if (op.vert != 0) glProgramUniform1iv(op.vert, 0, 1, &op.id);
-    if (op.frag != 0) glProgramUniform1iv(op.frag, 0, 1, &op.id);
+    if (op.vert != 0) glProgramUniform1iv(op.vert, 0, 1, &op.index);
+    if (op.frag != 0) glProgramUniform1iv(op.frag, 0, 1, &op.index);
 
     glBindProgramPipeline(op.ppo);
     profE("bind");
 
     profB("submit");
-    for (int i = 0; i < op.cmd_count; i += 1) {
+    unsigned mode = op.mode;
+    for (int i = 0, cmd_count = op.cmd_count; i < cmd_count; i += 1) {
       struct gpu_cmd_t cmd = op.cmd[i];
-      glDrawArraysInstanced(op.mode, cmd.first, cmd.count, cmd.instance_count);
+      glDrawArraysInstanced(mode, cmd.first, cmd.count, cmd.instance_count);
     }
     profE("submit");
   }
   profE(__func__);
 }
 
-static inline void GpuDrawXfb(int gpu_op_count, const struct gpu_op_t * gpu_op) {
+static inline void GpuDrawXfb(int gpu_op_count, struct gpu_op_t * gpu_op) {
   profB(__func__);
   for (int i = 0; i < gpu_op_count; i += 1) {
     struct gpu_op_t op = gpu_op[i];
@@ -780,17 +836,18 @@ static inline void GpuDrawXfb(int gpu_op_count, const struct gpu_op_t * gpu_op) 
     if (op.tex != NULL) glBindTextures(op.tex_first, op.tex_count, op.tex);
     if (op.smp != NULL) glBindSamplers(op.smp_first, op.smp_count, op.smp);
 
-    if (op.vert != 0) glProgramUniform1iv(op.vert, 0, 1, &op.id);
-    if (op.frag != 0) glProgramUniform1iv(op.frag, 0, 1, &op.id);
+    if (op.vert != 0) glProgramUniform1iv(op.vert, 0, 1, &op.index);
+    if (op.frag != 0) glProgramUniform1iv(op.frag, 0, 1, &op.index);
 
     glBindProgramPipeline(op.ppo);
     profE("bind");
 
     profB("submit");
     glBeginTransformFeedback(op.mode);
-    for (int i = 0; i < op.cmd_count; i += 1) {
+    unsigned mode = op.mode;
+    for (int i = 0, cmd_count = op.cmd_count; i < cmd_count; i += 1) {
       struct gpu_cmd_t cmd = op.cmd[i];
-      glDrawArraysInstanced(op.mode, cmd.first, cmd.count, cmd.instance_count);
+      glDrawArraysInstanced(mode, cmd.first, cmd.count, cmd.instance_count);
     }
     glEndTransformFeedback();
     profE("submit");
@@ -799,8 +856,8 @@ static inline void GpuDrawXfb(int gpu_op_count, const struct gpu_op_t * gpu_op) 
 }
 
 static inline void GpuBlit(
-    uint32_t source_fbo_id, int source_color_id, int source_x, int source_y, int source_width, int source_height,
-    uint32_t target_fbo_id, int target_color_id, int target_x, int target_y, int target_width, int target_height)
+    unsigned source_fbo_id, int source_color_id, int source_x, int source_y, int source_width, int source_height,
+    unsigned target_fbo_id, int target_color_id, int target_x, int target_y, int target_width, int target_height)
 {
   profB(__func__);
   glNamedFramebufferReadBuffer(source_fbo_id, 36064 + source_color_id);
@@ -814,7 +871,7 @@ static inline void GpuBlit(
 }
 
 static inline void GpuBlitToScreen(
-    uint32_t source_fbo_id, int source_color_id,
+    unsigned source_fbo_id, int source_color_id,
     int source_x, int source_y, int source_width, int source_height,
     int screen_x, int screen_y, int screen_width, int screen_height)
 {
@@ -847,13 +904,13 @@ static inline void GpuFinish() {
   profE(__func__);
 }
 
-static inline void GpuEnable(uint32_t flags) {
+static inline void GpuEnable(unsigned flags) {
   profB(__func__);
   glEnable(flags);
   profE(__func__);
 }
 
-static inline void GpuDisable(uint32_t flags) {
+static inline void GpuDisable(unsigned flags) {
   profB(__func__);
   glDisable(flags);
   profE(__func__);
@@ -865,19 +922,14 @@ static inline void GpuViewport(int x, int y, int width, int height) {
   profE(__func__);
 }
 
-#ifndef GPU_DEBUG_CALLBACK
-
-static inline void GpuSetDebugCallback(void * callback, void * user_data) {}
-static inline void GpuDebugCallback(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char * message, void * userdata) {}
-
-#else // GPU_DEBUG_CALLBACK
+#ifndef RELEASE
 
 static inline void GpuSetDebugCallback(void * callback, void * user_data) {
   glDebugMessageCallback(callback, user_data);
 }
 
-static inline void GpuDebugCallback(uint32_t source, uint32_t type, uint32_t id, uint32_t severity, int32_t length, const char * message, void * userdata) {
-  const char * GL_ERROR_SOURCE[] = {
+static inline void GpuDebugCallback(unsigned source, unsigned type, unsigned id, unsigned severity, int length, char * message, void * userdata) {
+  char * GL_ERROR_SOURCE[] = {
     "API",
     "WINDOW SYSTEM",
     "SHADER COMPILER",
@@ -886,14 +938,14 @@ static inline void GpuDebugCallback(uint32_t source, uint32_t type, uint32_t id,
     "OTHER"
   };
 
-  const char * GL_ERROR_SEVERITY[] = {
+  char * GL_ERROR_SEVERITY[] = {
     "HIGH",
     "MEDIUM",
     "LOW",
     "NOTIFICATION"
   };
 
-  const char * GL_ERROR_TYPE[] = {
+  char * GL_ERROR_TYPE[] = {
     "ERROR",
     "DEPRECATED BEHAVIOR",
     "UNDEFINED DEHAVIOUR",
@@ -918,4 +970,9 @@ static inline void GpuDebugCallback(uint32_t source, uint32_t type, uint32_t id,
     message);
 }
 
-#endif // GPU_DEBUG_CALLBACK
+#else // RELEASE
+
+static inline void GpuSetDebugCallback(void *, void *) {}
+static inline void GpuDebugCallback(unsigned, unsigned, unsigned, unsigned, int, char *, void *) {}
+
+#endif // RELEASE

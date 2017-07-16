@@ -1,4 +1,3 @@
-#define GPU_DEBUG_CALLBACK
 #include "../../gpulib.h"
 
 typedef struct { float x, y, z, w; } v4;
@@ -63,7 +62,7 @@ int main() {
   let mat_1_tex = GpuCast(mat_1, gpu_x_f32_t, 0, dim * sizeof(float));
   let mat_2_tex = GpuCast(mat_2, gpu_x_f32_t, 0, dim * sizeof(float));
 
-  uint32_t textures[] = {
+  unsigned textures[] = {
     [0] = mat_1_tex,
     [1] = mat_2_tex
   };

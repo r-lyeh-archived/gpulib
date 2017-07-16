@@ -8,7 +8,7 @@
 #extension GL_ARB_explicit_uniform_location : enable
 out gl_PerVertex { vec4 gl_Position; };
 
-layout(location = 0) uniform int id;
+layout(location = 0) uniform int index;
 layout(location = 1) uniform vec3 cam_pos;
 layout(location = 2) uniform vec4 cam_rot;
 layout(location = 3) uniform float fov_x;

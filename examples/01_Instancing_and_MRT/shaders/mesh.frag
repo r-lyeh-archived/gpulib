@@ -7,10 +7,10 @@
 #extension GL_ARB_shading_language_packing  : enable
 #extension GL_ARB_explicit_uniform_location : enable
 
-layout(location = 0) uniform int id;
+layout(location = 0) uniform int index;
 layout(location = 1) uniform vec3 cam_pos;
 layout(location = 2) uniform int show_pass;
-layout(location = 3) uniform int cube_id;
+layout(location = 3) uniform int cube_index;
 
 layout(binding = 2) uniform sampler2DArray s_texture;
 layout(binding = 3) uniform samplerCubeArray s_cubemaps;
@@ -38,19 +38,19 @@ vec3 IntToColor(int i) {
 
 void main() {
   vec4 diff = texture(s_texture, vec3(uv, 0));
-  vec4 refl = texture(s_cubemaps, vec4(reflect((pos - cam_pos), nor), cube_id));
+  vec4 refl = texture(s_cubemaps, vec4(reflect((pos - cam_pos), nor), cube_index));
   vec4 tint = vec4(0);
 
-  if (id == 0) tint += vec4(1, 0, 0, 1);
-  if (id == 1) tint += vec4(0, 1, 0, 1);
-  if (id == 2) tint += vec4(0, 0, 1, 1);
+  if (index == 0) tint += vec4(1, 0, 0, 1);
+  if (index == 1) tint += vec4(0, 1, 0, 1);
+  if (index == 2) tint += vec4(0, 0, 1, 1);
 
   fbo_color = mix(diff * 0.4 + tint * 0.6, refl, dot(nor, normalize(pos - cam_pos)) * 0.5 + 0.5);
 
   if (show_pass == 1) fbo_color = diff;
   if (show_pass == 2) fbo_color = refl;
   if (show_pass == 3) fbo_color = tint;
-  if (show_pass == 4) fbo_color = vec4(IntToColor(id + 1), 1);
+  if (show_pass == 4) fbo_color = vec4(IntToColor(index + 1), 1);
   if (show_pass == 5) fbo_color = vec4(uv, 0, 1);
   if (show_pass == 6) fbo_color = vec4(nor, 1);
   if (show_pass == 7) fbo_color = vec4(pos, 1);

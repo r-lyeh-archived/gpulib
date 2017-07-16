@@ -1,4 +1,3 @@
-#define GPU_DEBUG_CALLBACK
 #include "../../gpulib.h"
 
 typedef struct { float x, y, z; } v3;
@@ -14,12 +13,12 @@ int main() {
   mesh[1] = (v3){-0.5, -0.5, 0.0};
   mesh[2] = (v3){ 0.5, -0.5, 0.0};
 
-  uint32_t mesh_tex = GpuCast(mesh, gpu_xyz_f32_t, 0, 3 * sizeof(v3));
+  unsigned mesh_tex = GpuCast(mesh, gpu_xyz_f32_t, 0, 3 * sizeof(v3));
 
-  uint32_t textures[16] = {0};
+  unsigned textures[16] = {0};
   textures[0] = mesh_tex;
 
-  uint32_t vert = GpuVert(
+  unsigned vert = GpuVert(
       GPU_VERT_HEAD " layout(binding = 0) uniform samplerBuffer s_pos; \n"
                     "                                                  \n"
                     " void main() {                                    \n"
@@ -27,14 +26,14 @@ int main() {
                     "   gl_Position = vec4(pos, 1);                    \n"
                     " }                                                \n");
 
-  uint32_t frag = GpuFrag(
+  unsigned frag = GpuFrag(
       GPU_FRAG_HEAD " layout(location = 0) out vec4 color; \n"
                     "                                      \n"
                     " void main() {                        \n"
                     "   color = vec4(1);                   \n"
                     " }                                    \n");
 
-  uint32_t ppo = GpuPpo(vert, frag);
+  unsigned ppo = GpuPpo(vert, frag);
 
   struct gpu_cmd_t cmd[1] = {0};
   cmd[0].count = 3;

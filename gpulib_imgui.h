@@ -24,12 +24,12 @@ struct ImGuiIO {
   struct ImVec2 DisplaySize;
   float DeltaTime;
   float IniSavingRate;
-  const char * IniFilename;
-  const char * LogFilename;
+  char * IniFilename;
+  char * LogFilename;
   float MouseDoubleClickTime;
   float MouseDoubleClickMaxDist;
   float MouseDragThreshold;
-  int32_t KeyMap[19];
+  int KeyMap[19];
   float KeyRepeatDelay;
   float KeyRepeatRate;
   void * UserData;
@@ -41,11 +41,11 @@ struct ImGuiIO {
   struct ImVec2 DisplayVisibleMax;
   bool OSXBehaviors;
   void (*RenderDrawListsFn)(struct ImDrawData * data);
-  const char * (*GetClipboardTextFn)();
-  void (*SetClipboardTextFn)(const char * text);
+  char * (*GetClipboardTextFn)();
+  void (*SetClipboardTextFn)(char * text);
   void * (*MemAllocFn)(size_t sz);
   void (*MemFreeFn)(void * ptr);
-  void (*ImeSetInputScreenPosFn)(int32_t x, int32_t y);
+  void (*ImeSetInputScreenPosFn)(int x, int y);
   void * ImeWindowHandle;
   struct ImVec2 MousePos;
   bool MouseDown[5];
@@ -56,15 +56,15 @@ struct ImGuiIO {
   bool KeyAlt;
   bool KeySuper;
   bool KeysDown[512];
-  uint16_t InputCharacters[17];
+  unsigned short InputCharacters[17];
   bool WantCaptureMouse;
   bool WantCaptureKeyboard;
   bool WantTextInput;
   float Framerate;
-  int32_t MetricsAllocs;
-  int32_t MetricsRenderVertices;
-  int32_t MetricsRenderIndices;
-  int32_t MetricsActiveWindows;
+  int MetricsAllocs;
+  int MetricsRenderVertices;
+  int MetricsRenderIndices;
+  int MetricsActiveWindows;
   struct ImVec2 MousePosPrev;
   struct ImVec2 MouseDelta;
   bool MouseClicked[5];
@@ -83,13 +83,13 @@ struct ImGuiIO {
 struct ImDrawData {
   bool Valid;
   struct ImDrawList ** CmdLists;
-  int32_t CmdListsCount;
-  int32_t TotalVtxCount;
-  int32_t TotalIdxCount;
+  int CmdListsCount;
+  int TotalVtxCount;
+  int TotalIdxCount;
 };
 
 struct ImDrawCmd {
-  int32_t ElemCount;
+  int ElemCount;
   struct ImVec4 ClipRect;
   ImTextureID TextureId;
   ImDrawCallback UserCallback;
@@ -99,7 +99,7 @@ struct ImDrawCmd {
 typedef struct {
   struct ImVec2 pos;
   struct ImVec2 uv;
-  uint32_t col;
+  unsigned col;
 } ImDrawVtx;
 
 enum ImGuiKey {
@@ -202,14 +202,14 @@ struct ImGuiStyle {
 static double g_time = 0;
 static float g_mouse_wheel = 0;
 static bool g_is_mouse_pressed[3] = {0};
-static uint32_t g_font_texture = 0, g_ppo = 0, g_vert = 0, g_frag = 0;
+static unsigned g_font_texture = 0, g_ppo = 0, g_vert = 0, g_frag = 0;
 
 static void imgui_render_draw_list(struct ImDrawData * draw_data) {
   struct ImGuiIO * io = igGetIO();
 
   struct ImVec2 fb_scale = io->DisplayFramebufferScale;
-  int32_t w = (int32_t)(io->DisplaySize.x * fb_scale.x);
-  int32_t h = (int32_t)(io->DisplaySize.y * fb_scale.y);
+  int w = (int)(io->DisplaySize.x * fb_scale.x);
+  int h = (int)(io->DisplaySize.y * fb_scale.y);
 
   ImDrawData_ScaleClipRects(draw_data, fb_scale);
   glViewport(0, 0, w, h);
@@ -231,17 +231,17 @@ static void imgui_render_draw_list(struct ImDrawData * draw_data) {
   ptrdiff_t idx_bytes = draw_data->TotalIdxCount * (ptrdiff_t)sizeof(ImDrawIdx);
   ptrdiff_t vtx_bytes = draw_data->TotalVtxCount * (ptrdiff_t)sizeof(ImDrawVtx);
 
-  uint32_t idx_mem_id = 0;
-  uint32_t vtx_mem_id = 0;
+  unsigned idx_mem_id = 0;
+  unsigned vtx_mem_id = 0;
   glCreateBuffers(1, &idx_mem_id);
   glCreateBuffers(1, &vtx_mem_id);
   glNamedBufferStorage(idx_mem_id, idx_bytes, 0, 194);
   glNamedBufferStorage(vtx_mem_id, vtx_bytes, 0, 194);
   void * idx = glMapNamedBufferRange(idx_mem_id, 0, idx_bytes, 194);
   void * vtx = glMapNamedBufferRange(vtx_mem_id, 0, vtx_bytes, 194);
-  uint32_t idx_tex_id = 0;
-  uint32_t vtx_f32_tex_id = 0;
-  uint32_t vtx_u32_tex_id = 0;
+  unsigned idx_tex_id = 0;
+  unsigned vtx_f32_tex_id = 0;
+  unsigned vtx_u32_tex_id = 0;
   glCreateTextures(35882, 1, &idx_tex_id);
   glCreateTextures(35882, 1, &vtx_f32_tex_id);
   glCreateTextures(35882, 1, &vtx_u32_tex_id);
@@ -253,35 +253,35 @@ static void imgui_render_draw_list(struct ImDrawData * draw_data) {
   ImDrawVtx * vtx_dest = vtx;
   for (ptrdiff_t i = 0, c = draw_data->CmdListsCount; i < c; i += 1) {
     struct ImDrawList * cmd_list = draw_data->CmdLists[i];
-    int32_t idx_size = ImDrawList_GetIndexBufferSize(cmd_list);
-    int32_t vtx_size = ImDrawList_GetVertexBufferSize(cmd_list);
+    int idx_size = ImDrawList_GetIndexBufferSize(cmd_list);
+    int vtx_size = ImDrawList_GetVertexBufferSize(cmd_list);
     SDL_memcpy(idx_dest, ImDrawList_GetIndexPtr(cmd_list, 0), (size_t)idx_size * sizeof(ImDrawIdx));
     SDL_memcpy(vtx_dest, ImDrawList_GetVertexPtr(cmd_list, 0), (size_t)vtx_size * sizeof(ImDrawVtx));
     idx_dest += idx_size;
     vtx_dest += vtx_size;
   }
 
-  uint32_t input[4] = {0};
+  unsigned input[4] = {0};
   input[0] = 0;
   input[1] = vtx_f32_tex_id;
   input[2] = vtx_u32_tex_id;
   input[3] = idx_tex_id;
 
-  int32_t idx_offset = 0;
-  int32_t vtx_offset = 0;
+  int idx_offset = 0;
+  int vtx_offset = 0;
   for (ptrdiff_t i = 0, c = draw_data->CmdListsCount; i < c; i += 1) {
     struct ImDrawList * cmd_list = draw_data->CmdLists[i];
     for (ptrdiff_t j = 0, c = ImDrawList_GetCmdSize(cmd_list); j < c; j += 1) {
-      struct ImDrawCmd * pcmd = ImDrawList_GetCmdPtr(cmd_list, (int32_t)j);
+      struct ImDrawCmd * pcmd = ImDrawList_GetCmdPtr(cmd_list, (int)j);
       if (pcmd->UserCallback) {
         pcmd->UserCallback(cmd_list, pcmd);
       } else {
-        glScissor((int32_t)(pcmd->ClipRect.x),
-                  (int32_t)(h - pcmd->ClipRect.w),
-                  (int32_t)(pcmd->ClipRect.z - pcmd->ClipRect.x),
-                  (int32_t)(pcmd->ClipRect.w - pcmd->ClipRect.y));
+        glScissor((int)(pcmd->ClipRect.x),
+                  (int)(h - pcmd->ClipRect.w),
+                  (int)(pcmd->ClipRect.z - pcmd->ClipRect.x),
+                  (int)(pcmd->ClipRect.w - pcmd->ClipRect.y));
         glProgramUniform1iv(g_vert, 2, 1, &vtx_offset);
-        input[0] = *(uint32_t *)pcmd->TextureId;
+        input[0] = *(unsigned *)pcmd->TextureId;
         glBindTextures(0, 4, input);
         glDrawArraysInstanced(0x0004, idx_offset, pcmd->ElemCount, 1); // GL_TRIANGLES
       }
@@ -302,11 +302,11 @@ static void imgui_render_draw_list(struct ImDrawData * draw_data) {
   glEnable(0x0B44);  // GL_CULL_FACE
 }
 
-static const char * imgui_get_clipboard_text() {
+static char * imgui_get_clipboard_text() {
   return SDL_GetClipboardText();
 }
 
-static void imgui_set_clipboard_text(const char * text) {
+static void imgui_set_clipboard_text(char * text) {
   SDL_SetClipboardText(text);
 }
 
@@ -329,7 +329,7 @@ bool imgui_process_event(SDL_Event * event) {
       return true;
     }
     break; case (SDL_KEYDOWN): {
-      int32_t key = event->key.keysym.sym & ~SDLK_SCANCODE_MASK;
+      int key = event->key.keysym.sym & ~SDLK_SCANCODE_MASK;
       io->KeysDown[key] = true;
       io->KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
       io->KeyCtrl  = ((SDL_GetModState() & KMOD_CTRL)  != 0);
@@ -338,7 +338,7 @@ bool imgui_process_event(SDL_Event * event) {
       return true;
     }
     break; case (SDL_KEYUP): {
-      int32_t key = event->key.keysym.sym & ~SDLK_SCANCODE_MASK;
+      int key = event->key.keysym.sym & ~SDLK_SCANCODE_MASK;
       io->KeysDown[key] = false;
       io->KeyShift = ((SDL_GetModState() & KMOD_SHIFT) != 0);
       io->KeyCtrl  = ((SDL_GetModState() & KMOD_CTRL)  != 0);
@@ -352,8 +352,8 @@ bool imgui_process_event(SDL_Event * event) {
 
 void imgui_create_font_texture() {
   struct ImGuiIO * io = igGetIO();
-  uint8_t * pixels = NULL;
-  int32_t width = 0, height = 0, bpp = 0;
+  unsigned char * pixels = NULL;
+  int width = 0, height = 0, bpp = 0;
   ImFontAtlas_GetTexDataAsRGBA32(io->Fonts, &pixels, &width, &height, &bpp);
   glCreateTextures(35866, 1, &g_font_texture);
   glTextureStorage3D(g_font_texture, 1, 0x8814, width, height, 1); // GL_RGBA32F
@@ -362,7 +362,7 @@ void imgui_create_font_texture() {
 }
 
 void imgui_create_device_objects() {
-  const char * vert_string =
+  char * vert_string =
       "#version 330                                                          \n"
       "#extension GL_ARB_gpu_shader5               : enable                  \n"
       "#extension GL_ARB_gpu_shader_fp64           : enable                  \n"
@@ -397,7 +397,7 @@ void imgui_create_device_objects() {
       "   gl_Position = vec4(fma(vec2(posx, posy), scale, translate), 0, 1); \n"
       " }                                                                    \n";
 
-  const char * frag_string =
+  char * frag_string =
       "#version 330                                               \n"
       "#extension GL_ARB_gpu_shader5               : enable       \n"
       "#extension GL_ARB_gpu_shader_fp64           : enable       \n"
@@ -419,11 +419,11 @@ void imgui_create_device_objects() {
       "   color = fs_col * texture(s_texture, vec3(fs_uv.st, 0)); \n"
       " }                                                         \n";
 
-  uint32_t vert_shader_id = glCreateShader(0x8B31); // GL_VERTEX_SHADER
-  uint32_t frag_shader_id = glCreateShader(0x8B30); // GL_FRAGMENT_SHADER
+  unsigned vert_shader_id = glCreateShader(0x8B31); // GL_VERTEX_SHADER
+  unsigned frag_shader_id = glCreateShader(0x8B30); // GL_FRAGMENT_SHADER
 
-  glShaderSource(vert_shader_id, 1, (const char **)&vert_string, NULL);
-  glShaderSource(frag_shader_id, 1, (const char **)&frag_string, NULL);
+  glShaderSource(vert_shader_id, 1, (char **)&vert_string, NULL);
+  glShaderSource(frag_shader_id, 1, (char **)&frag_string, NULL);
 
   glCompileShader(vert_shader_id);
   glCompileShader(frag_shader_id);
@@ -460,7 +460,7 @@ void imgui_new_frame(SDL_Window * sdl_window, bool process_inputs) {
   if (!g_font_texture)
     imgui_create_device_objects();
 
-  int32_t w = 0, h = 0, dp_w = 0, dp_h = 0;
+  int w = 0, h = 0, dp_w = 0, dp_h = 0;
   SDL_GetWindowSize(sdl_window, &w, &h);
   SDL_GL_GetDrawableSize(sdl_window, &dp_w, &dp_h);
   io->DisplaySize = (struct ImVec2){(float)w,(float)h};
@@ -469,14 +469,14 @@ void imgui_new_frame(SDL_Window * sdl_window, bool process_inputs) {
     h > 0 ? ((float)dp_h / h) : 0
   };
 
-  uint32_t time = SDL_GetTicks();
+  unsigned time = SDL_GetTicks();
   double current_time = time / 1000.0;
   io->DeltaTime = g_time > 0 ? (float)(current_time - g_time) : 1 / 60.0;
   g_time = current_time;
 
   if (process_inputs) {
-    int32_t mx = 0, my = 0;
-    uint32_t mousemask = SDL_GetMouseState(&mx, &my);
+    int mx = 0, my = 0;
+    unsigned mousemask = SDL_GetMouseState(&mx, &my);
 
     if (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_MOUSE_FOCUS)
       io->MousePos = (struct ImVec2){(float)mx, (float)my};

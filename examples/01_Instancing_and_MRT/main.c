@@ -1,4 +1,3 @@
-#define GPU_DEBUG_CALLBACK
 #include "../../gpulib.h"
 
 typedef struct { float x, y, z; } v3;
@@ -98,7 +97,7 @@ static inline float sindegdiv2(float d) { return sin(d * (M_PI / 180.0) / 2.0); 
 static inline float cosdegdiv2(float d) { return cos(d * (M_PI / 180.0) / 2.0); }
 static inline float tandegdiv2(float d) { return tan(d * (M_PI / 180.0) / 2.0); }
 
-static inline void ReadIBO(const char * ibo_filepath, ptrdiff_t * bytes, v4 * data) {
+static inline void ReadIBO(char * ibo_filepath, ptrdiff_t * bytes, v4 * data) {
   SDL_RWops * fd = SDL_RWFromFile(ibo_filepath, "rb");
 
   SDL_assert(fd != NULL);
@@ -142,9 +141,9 @@ int main() {
   v4 * monkey_mesh = meshes;
   v4 * sphere_mesh = meshes;
   v4 * teapot_mesh = meshes;
-  uint32_t monkey_mesh_tex = 0;
-  uint32_t sphere_mesh_tex = 0;
-  uint32_t teapot_mesh_tex = 0;
+  unsigned monkey_mesh_tex = 0;
+  unsigned sphere_mesh_tex = 0;
+  unsigned teapot_mesh_tex = 0;
   {
     ptrdiff_t i = 0;
     monkey_mesh += i / sizeof(v4); monkey_mesh_tex = GpuCast(meshes, gpu_xyzw_f32_t, i, monkey_bytes); i += monkey_bytes;
@@ -172,18 +171,18 @@ int main() {
   let sphere_pos_tex = GpuCast(pos, gpu_xyz_f32_t, 1 * 30 * sizeof(v3), 30 * sizeof(v3));
   let teapot_pos_tex = GpuCast(pos, gpu_xyz_f32_t, 2 * 30 * sizeof(v3), 30 * sizeof(v3));
 
-  const char * tex[] = {
+  char * tex[] = {
     g_resources.texture_1,
     g_resources.texture_2,
     g_resources.texture_3
   };
 
-  const char * cbm_px[] = {g_resources.cube_1_px, g_resources.cube_2_px};
-  const char * cbm_nx[] = {g_resources.cube_1_nx, g_resources.cube_2_nx};
-  const char * cbm_py[] = {g_resources.cube_1_py, g_resources.cube_2_py};
-  const char * cbm_ny[] = {g_resources.cube_1_ny, g_resources.cube_2_ny};
-  const char * cbm_pz[] = {g_resources.cube_1_pz, g_resources.cube_2_pz};
-  const char * cbm_nz[] = {g_resources.cube_1_nz, g_resources.cube_2_nz};
+  char * cbm_px[] = {g_resources.cube_1_px, g_resources.cube_2_px};
+  char * cbm_nx[] = {g_resources.cube_1_nx, g_resources.cube_2_nx};
+  char * cbm_py[] = {g_resources.cube_1_py, g_resources.cube_2_py};
+  char * cbm_ny[] = {g_resources.cube_1_ny, g_resources.cube_2_ny};
+  char * cbm_pz[] = {g_resources.cube_1_pz, g_resources.cube_2_pz};
+  char * cbm_nz[] = {g_resources.cube_1_nz, g_resources.cube_2_nz};
 
   let textures = GpuMallocImg(gpu_srgb_s3tc_dxt1_b8_t, 512, 512, countof(tex), 1);
   let skyboxes = GpuMallocCbm(gpu_srgb_s3tc_dxt1_b8_t, 512, 512, countof(cbm_px), 1);
@@ -202,25 +201,25 @@ int main() {
   let mrt_msi_fbo = GpuFbo(mrt_msi_color, 0, 0, 0, 0, 0, 0, 0, mrt_msi_depth, 0);
   let mrt_nms_fbo = GpuFbo(mrt_nms_color, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-  uint32_t monkey_textures[] = {
+  unsigned monkey_textures[] = {
     [0] = monkey_mesh_tex,
     [1] = monkey_pos_tex,
     [2] = monkey_tex
   };
 
-  uint32_t sphere_textures[] = {
+  unsigned sphere_textures[] = {
     [0] = sphere_mesh_tex,
     [1] = sphere_pos_tex,
     [2] = sphere_tex
   };
 
-  uint32_t teapot_textures[] = {
+  unsigned teapot_textures[] = {
     [0] = teapot_mesh_tex,
     [1] = teapot_pos_tex,
     [2] = teapot_tex
   };
 
-  uint32_t other_textures[] = {
+  unsigned other_textures[] = {
     [3] = skyboxes,
     [4] = mrt_nms_color
   };
@@ -228,11 +227,11 @@ int main() {
   let smp_textures = GpuSmp(4, gpu_linear_mipmap_linear_t, gpu_linear_t, gpu_repeat_t);
   let smp_mrtcolor = GpuSmp(1, gpu_nearest_t, gpu_nearest_t, gpu_clamp_to_border_t);
 
-  uint32_t mesh_samplers[] = {
+  unsigned mesh_samplers[] = {
     [2] = smp_textures
   };
 
-  uint32_t other_samplers[] = {
+  unsigned other_samplers[] = {
     [3] = smp_textures,
     [4] = smp_mrtcolor
   };
@@ -255,19 +254,19 @@ int main() {
     [1].vert = mesh_vert, [1].frag = mesh_frag, [1].ppo = mesh_ppo, [1].smp_count = countof(mesh_samplers), [1].smp = mesh_samplers, [1].mode = gpu_triangles_t,
     [2].vert = mesh_vert, [2].frag = mesh_frag, [2].ppo = mesh_ppo, [2].smp_count = countof(mesh_samplers), [2].smp = mesh_samplers, [2].mode = gpu_triangles_t,
 
-    [0].id = 0,
+    [0].index = 0,
     [0].tex_count = countof(monkey_textures),
     [0].cmd_count = countof(monkey_cmds),
     [0].tex = monkey_textures,
     [0].cmd = monkey_cmds,
 
-    [1].id = 1,
+    [1].index = 1,
     [1].tex_count = countof(sphere_textures),
     [1].cmd_count = countof(sphere_cmds),
     [1].tex = sphere_textures,
     [1].cmd = sphere_cmds,
 
-    [2].id = 2,
+    [2].index = 2,
     [2].tex_count = countof(teapot_textures),
     [2].cmd_count = countof(teapot_cmds),
     [2].tex = teapot_textures,
@@ -304,10 +303,10 @@ int main() {
   float fov_y = fov;
 
   SDL_SetRelativeMouseMode(1);
-  uint32_t t_prev = SDL_GetTicks();
+  unsigned t_prev = SDL_GetTicks();
 
   for (;;) {
-    uint32_t t_curr = SDL_GetTicks();
+    unsigned t_curr = SDL_GetTicks();
     double dt = ((t_curr - t_prev) * 60.0) / 1000.0;
 
     SDL_PumpEvents();
@@ -353,11 +352,11 @@ int main() {
     GpuF32(cube_vert, 1, 1, &fov_x);
     GpuF32(cube_vert, 2, 1, &fov_y);
 
-    static int cube_id = 0;
-    if (key[SDL_SCANCODE_9]) { cube_id = 1; show_pass = 0; }
-    if (key[SDL_SCANCODE_0]) { cube_id = 0; show_pass = 0; }
-    GpuI32(mesh_frag, 3, 1, &cube_id);
-    GpuI32(cube_frag, 0, 1, &cube_id);
+    static int cube_index = 0;
+    if (key[SDL_SCANCODE_9]) { cube_index = 1; show_pass = 0; }
+    if (key[SDL_SCANCODE_0]) { cube_index = 0; show_pass = 0; }
+    GpuI32(mesh_frag, 3, 1, &cube_index);
+    GpuI32(cube_frag, 0, 1, &cube_index);
 
     float t = t_curr / 1000.0;
     GpuF32(quad_frag, 0, 1, &t);

@@ -1,4 +1,3 @@
-#define GPU_DEBUG_CALLBACK
 #include "../../gpulib_imgui.h"
 #include "../../gpulib.h"
 
@@ -33,18 +32,18 @@ int main() {
       static struct ImVec3 color_for_pops = { 33 / 255.0,  46 / 255.0,  60 / 255.0};
 
       // Mint Y Dark:
-      //static struct ImVec3 color_for_text = (struct ImVec3){211 / 255.0, 211 / 255.0, 211 / 255.0};
-      //static struct ImVec3 color_for_head = (struct ImVec3){ 95 / 255.0, 142 / 255.0,  85 / 255.0};
-      //static struct ImVec3 color_for_area = (struct ImVec3){ 47 / 255.0,  47 / 255.0,  47 / 255.0};
-      //static struct ImVec3 color_for_body = (struct ImVec3){ 64 / 255.0,  64 / 255.0,  64 / 255.0};
-      //static struct ImVec3 color_for_pops = (struct ImVec3){ 30 / 255.0,  30 / 255.0,  30 / 255.0};
+      //static struct ImVec3 color_for_text = {211 / 255.0, 211 / 255.0, 211 / 255.0};
+      //static struct ImVec3 color_for_head = { 95 / 255.0, 142 / 255.0,  85 / 255.0};
+      //static struct ImVec3 color_for_area = { 47 / 255.0,  47 / 255.0,  47 / 255.0};
+      //static struct ImVec3 color_for_body = { 64 / 255.0,  64 / 255.0,  64 / 255.0};
+      //static struct ImVec3 color_for_pops = { 30 / 255.0,  30 / 255.0,  30 / 255.0};
 
       // Arc Theme:
-      //static struct ImVec3 color_for_text = (struct ImVec3){211 / 255.0, 218 / 255.0, 227 / 255.0};
-      //static struct ImVec3 color_for_head = (struct ImVec3){ 64 / 255.0, 132 / 255.0, 214 / 255.0};
-      //static struct ImVec3 color_for_area = (struct ImVec3){ 47 / 255.0,  52 / 255.0,  63 / 255.0};
-      //static struct ImVec3 color_for_body = (struct ImVec3){ 56 / 255.0,  60 / 255.0,  74 / 255.0};
-      //static struct ImVec3 color_for_pops = (struct ImVec3){ 28 / 255.0,  30 / 255.0,  37 / 255.0};
+      //static struct ImVec3 color_for_text = {211 / 255.0, 218 / 255.0, 227 / 255.0};
+      //static struct ImVec3 color_for_head = { 64 / 255.0, 132 / 255.0, 214 / 255.0};
+      //static struct ImVec3 color_for_area = { 47 / 255.0,  52 / 255.0,  63 / 255.0};
+      //static struct ImVec3 color_for_body = { 56 / 255.0,  60 / 255.0,  74 / 255.0};
+      //static struct ImVec3 color_for_pops = { 28 / 255.0,  30 / 255.0,  37 / 255.0};
 
       igColorEdit3("Text", &color_for_text.x);
       igColorEdit3("Head", &color_for_head.x);
